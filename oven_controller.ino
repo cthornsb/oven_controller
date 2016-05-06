@@ -1,5 +1,5 @@
 #include <SPI.h>
-#include <SD.h>
+#include "SdFat.h"
 #include "Adafruit_MAX31855.h"
 
 #define USE_SERIAL
@@ -45,7 +45,11 @@ char filename[13] = "DATA0001.DAT";
 bool sd_card_okay = false;
 bool over_temp = false;
 
-File myFile;
+// File system object.
+SdFat sd;
+
+// Log file.
+SdFile file;
 
 // initialize the Thermocouple.
 Adafruit_MAX31855 thermocouple(CLK_PIN, THERMO_CHIPSELECT, DO_PIN);
@@ -64,22 +68,28 @@ void openFile(){
     temp_filename.toCharArray(filename, 14);
 
     file_number++;
-    if (!SD.exists(filename)) { break; }
+    if (!sd.exists(filename)) { break; }
   }
 
 #ifdef USE_SERIAL     
   // Print the new filename to the serial monitor.
   Serial.print("Opening SD file ");
-  Serial.println(filename);
+  Serial.print(filename);
+  Serial.print("... ");
 #endif
      
   // Open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  File myFile = SD.open(filename, FILE_WRITE);
-  
-  // If the file opened okay, write to it.
-  if (myFile) {
-    myFile.print("time(s)\tT(C)\tP(mTorr)\tR1\tR2\n");
+  if (file.open(filename, O_CREAT | O_WRITE | O_EXCL)) {
+#ifdef USE_SERIAL     
+    Serial.println("done.");
+#endif
+    file.print("time(s)\tT(C)\tP(mTorr)\tR1\tR2\n");
+  }
+  else{
+#ifdef USE_SERIAL     
+    Serial.println("failed!");
+#endif
   }
 }
 
@@ -90,28 +100,20 @@ void initSD(){
   Serial.print("Initializing SD card... ");
 #endif
   
-  // Close the file, if it's open.
-  if(myFile){ myFile.close(); }
-  
-  // Pint 10 must be left as output for SPI.
+  // Pin 10 must be left as output for SPI.
   pinMode(10, OUTPUT);
-  
-  // Initialize the sd card. Ignore the error if it
-  // returns false. Files may still be written.
-  SD.begin(SD_CHIPSELECT);
 
-  // To ensure the SD card is okay, check to see if a test file exists:
-  if (SD.exists("CARD.DAT")) {
+  if(sd.begin(SD_CHIPSELECT, SPI_HALF_SPEED)){
 #ifdef USE_SERIAL     
     Serial.println("done.");
-#endif 
-  } 
+#endif     
+  }
   else{
 #ifdef USE_SERIAL     
     Serial.println("failed!");
 #endif
-    return;
-  } 
+    return;  
+  }
 
   // Open a new data file.
   sd_card_okay = true;
@@ -190,35 +192,36 @@ void loop() {
   }
   else if(sd_card_okay && card_detect == 0){ // Check for removed SD card.
     sd_card_okay = false;
-    myFile.close();
+    file.close();
   }
   
   // Check if it's time to write to file/serial.
   if(time % WRITE_WAIT == 0){    
-    if(sd_card_okay){
-      // Write to the sd card.
-      if (myFile) {
-        // Print the time.
-        myFile.write(time);
-        myFile.write("\t");
+    if(sd_card_okay){ // Write to the sd card.
+      // Print the time.
+      file.print(time);
+      file.print("\t");
+    
+      // Print the temperature.
+      if(isnan(temp)){ file.print("nan"); }
+      else{ file.print(temp); }
+      file.print("\t");
+    
+      // Print the pressure.
+      file.print(pres);
+      file.print("\t");
+    
+      // Print the relay states.
+      file.print(relay1_state);
+      file.print("\t");
+      file.print(relay2_state);
+      file.print("\n");
       
-        // Print the temperature.
-        if(isnan(temp)){ myFile.write("nan"); }
-        else{ myFile.write(temp); }
-        myFile.write("\t");
-      
-        // Print the pressure.
-        myFile.write(pres);
-        myFile.write("\t");
-      
-        // Print the relay states.
-        myFile.write(relay1_state);
-        myFile.write("\t");
-        myFile.write(relay2_state);
-        myFile.write("\n");
-        
-        // Flush to the file.
-        myFile.flush();
+      // Force data to SD and update the directory entry to avoid data loss.
+      if (!file.sync() || file.getWriteError()) {
+#ifdef USE_SERIAL
+        Serial.println("Failed to flush to SD file!");
+#endif
       }
     }
 #ifdef USE_SERIAL
