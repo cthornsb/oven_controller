@@ -30,7 +30,7 @@
 #define OVEN_MIN_TEMP 78.0
 
 // Time (in seconds) to wait between writes.
-#define WRITE_WAIT 2
+#define WRITE_WAIT 1
 
 // The time since the program started.
 unsigned long time;
@@ -53,6 +53,20 @@ SdFile file;
 
 // initialize the Thermocouple.
 Adafruit_MAX31855 thermocouple(CLK_PIN, THERMO_CHIPSELECT, DO_PIN);
+
+// Write len_ bytes to the SD file.
+void writeBytes(byte *val_, const byte &len_){
+  if(!file.isOpen() || !val_ || len_==0){ return; }
+  
+  long container;
+  memcpy((byte*)&container, val_, len_);
+  
+  byte current;
+  for(byte index = 0; index < len_; index++){
+    current = (*val_ >> 8*index) & 0xFF;
+    file.write(current);
+  }
+}
 
 void openFile(){
   if(!sd_card_okay){ return; }
@@ -84,7 +98,6 @@ void openFile(){
 #ifdef USE_SERIAL     
     Serial.println("done.");
 #endif
-    file.print("time(s)\tT(C)\tP(mTorr)\tR1\tR2\n");
   }
   else{
 #ifdef USE_SERIAL     
@@ -138,7 +151,7 @@ void setup() {
   Serial.begin(9600);
   
   // Inform the user that we've started.
-  Serial.print("time(s)\tT(C)\tP(mTorr)\tR1\tR2\n");
+  Serial.print("time(s)\tT(C)\tP(Torr)\tR1\tR2\n");
 #endif
 
   // Check for inserted SD card.
@@ -156,7 +169,11 @@ void loop() {
   double temp = thermocouple.readCelsius();
   
   // Read the pressure from the pressure gauge.
-  double pres = (analogRead(PRESSURE_PIN)/1023.0)*5.0;
+  double pres = (analogRead(PRESSURE_PIN)/1023.0 - 1.0)*5.0;
+  
+  // Convert the pressure voltage to an actual pressure.
+  if(pres >= 0.0){ pres = pow(10.0, (float)pres); }
+  else{ pres = 1.0/pow(10.0, (float)(-1*pres)); }
   
   // Check for oven over temp.
   if(!over_temp){
@@ -194,28 +211,22 @@ void loop() {
     sd_card_okay = false;
     file.close();
   }
-  
+
   // Check if it's time to write to file/serial.
   if(time % WRITE_WAIT == 0){    
     if(sd_card_okay){ // Write to the sd card.
-      // Print the time.
-      file.print(time);
-      file.print("\t");
+      // Write the time.
+      writeBytes((byte*)&time, 4);
     
-      // Print the temperature.
-      if(isnan(temp)){ file.print("nan"); }
-      else{ file.print(temp); }
-      file.print("\t");
+      // Write the temperature.
+      writeBytes((byte*)&temp, 4);
     
-      // Print the pressure.
-      file.print(pres);
-      file.print("\t");
+      // Write the pressure.
+      writeBytes((byte*)&pres, 4);
     
-      // Print the relay states.
-      file.print(relay1_state);
-      file.print("\t");
-      file.print(relay2_state);
-      file.print("\n");
+      // Write the relay states.
+      writeBytes((byte*)&relay1_state, 2);
+      writeBytes((byte*)&relay2_state, 2);
       
       // Force data to SD and update the directory entry to avoid data loss.
       if (!file.sync() || file.getWriteError()) {
