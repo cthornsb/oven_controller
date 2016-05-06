@@ -63,7 +63,7 @@ void writeBytes(byte *val_, const byte &len_){
   
   byte current;
   for(byte index = 0; index < len_; index++){
-    current = (*val_ >> 8*index) & 0xFF;
+    current = (container >> 8*index) & 0xFF;
     file.write(current);
   }
 }
