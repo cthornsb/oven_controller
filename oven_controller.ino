@@ -121,6 +121,9 @@ void initSD(){
 }
 
 void setup() {
+  // Wait for MAX chip to stabilize
+  delay(500);
+
   // Initialize the digital input pins.
   pinMode(RELAY_1_IN, INPUT);
   pinMode(RELAY_2_IN, INPUT);
@@ -142,9 +145,6 @@ void setup() {
   if(digitalRead(CARD_DETECT_PIN)){
     initSD();
   }
-    
-  // Wait for MAX chip to stabilize
-  delay(500);
 }
 
 void loop() {
