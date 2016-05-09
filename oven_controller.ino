@@ -151,7 +151,7 @@ void setup() {
   Serial.begin(9600);
   
   // Inform the user that we've started.
-  Serial.print("time(s)\tT(C)\tP(Torr)\tR1\tR2\n");
+  Serial.print("time(ms)\tT(C)\tP(V)\tR1\tR2\n");
 #endif
 
   // Check for inserted SD card.
@@ -196,8 +196,8 @@ void loop() {
     prev_relay2_state = relay2_state;
   }    
   
-  // Get the current time (s).
-  time = millis()/1000;
+  // Get the current time (ms).
+  time = millis();
     
   // Hot-swappable SD card handler.
   if(!sd_card_okay && card_detect == 1){ // Check for newly inserted SD card.
@@ -209,7 +209,7 @@ void loop() {
   }
 
   // Check if it's time to write to file/serial.
-  if(time % WRITE_WAIT == 0){    
+  if((time/1000) % WRITE_WAIT == 0){    
     if(sd_card_okay){ // Write to the sd card.
       // Write the time.
       writeBytes((byte*)&time, 4);

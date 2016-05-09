@@ -15,7 +15,7 @@ int main(int argc, char *argv[]){
 	
 	if(!file){ return 1; }
 	
-	std::cout << "time(s)\tT(C)\tP(Torr)\tR1\tR2\n";
+	std::cout << "time(ms)\tT(C)\tP(Torr)\tR1\tR2\n";
 	
 	unsigned int count = 0;
 	while(true){
