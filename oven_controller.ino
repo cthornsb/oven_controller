@@ -2,7 +2,7 @@
 #include "SdFat.h"
 #include "Adafruit_MAX31855.h"
 
-#define USE_SERIAL
+//#define USE_SERIAL
 
 // Set the chip select pins.
 #define THERMO_CHIPSELECT 4
