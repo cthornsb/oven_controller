@@ -29,11 +29,12 @@
 #define OVEN_MAX_TEMP 81.0
 #define OVEN_MIN_TEMP 78.0
 
-// Time (in seconds) to wait between writes.
-#define WRITE_WAIT 1
+// Time (in milliseconds) to wait between read cycles.
+#define READ_DELAY 1000
 
 // The time since the program started.
-unsigned long time;
+unsigned long timestamp;
+unsigned long new_time;
 
 // Variables to track 120V relay states.
 int prev_relay1_state = 0;
@@ -161,6 +162,10 @@ void setup() {
 }
 
 void loop() {
+  // Get the current time (ms).
+  timestamp = millis();
+
+  // Read the digital pins.
   int relay1_state = digitalRead(RELAY_1_IN);
   int relay2_state = digitalRead(RELAY_2_IN);
   int card_detect = digitalRead(CARD_DETECT_PIN);
@@ -195,10 +200,7 @@ void loop() {
     digitalWrite(RELAY_2_OUT, relay2_state);
     prev_relay2_state = relay2_state;
   }    
-  
-  // Get the current time (ms).
-  time = millis();
-    
+     
   // Hot-swappable SD card handler.
   if(!sd_card_okay && card_detect == 1){ // Check for newly inserted SD card.
     initSD();
@@ -208,50 +210,52 @@ void loop() {
     file.close();
   }
 
-  // Check if it's time to write to file/serial.
-  if((time/1000) % WRITE_WAIT == 0){    
-    if(sd_card_okay){ // Write to the sd card.
-      // Write the time.
-      writeBytes((byte*)&time, 4);
-    
-      // Write the temperature.
-      writeBytes((byte*)&temp, 4);
-    
-      // Write the pressure.
-      writeBytes((byte*)&pres, 4);
-    
-      // Write the relay states.
-      writeBytes((byte*)&relay1_state, 2);
-      writeBytes((byte*)&relay2_state, 2);
-      
-      // Force data to SD and update the directory entry to avoid data loss.
-      if (!file.sync() || file.getWriteError()) {
-#ifdef USE_SERIAL
-        Serial.println("Failed to flush to SD file!");
-#endif
-      }
-    }
-#ifdef USE_SERIAL
-    // Print the time.
-    Serial.print(time);
-    Serial.print("\t");
-    
-    // Print the temperature.
-    if(isnan(temp)){ Serial.print("nan"); }
-    else{ Serial.print(temp); }
-    Serial.print("\t");
-    
-    // Print the pressure.
-    Serial.print(pres);
-    Serial.print("\t");
-    
-    // Print the relay states.
-    Serial.print(relay1_state);
-    Serial.print("\t");
-    Serial.print(relay2_state);
-    Serial.print("\n");
-#endif
-  }
+  // Write to file/serial.
+  if(sd_card_okay){ // Write to the sd card.
+    // Write the time.
+    writeBytes((byte*)&timestamp, 4);
   
-  delay(1000);
+    // Write the temperature.
+    writeBytes((byte*)&temp, 4);
+  
+    // Write the pressure.
+    writeBytes((byte*)&pres, 4);
+  
+    // Write the relay states.
+    writeBytes((byte*)&relay1_state, 2);
+    writeBytes((byte*)&relay2_state, 2);
+    
+    // Force data to SD and update the directory entry to avoid data loss.
+    if (!file.sync() || file.getWriteError()) {
+#ifdef USE_SERIAL
+      Serial.println("Failed to sync to SD file!");
+#endif
+    }
+  }
+#ifdef USE_SERIAL
+  // Print the time.
+  Serial.print(time);
+  Serial.print("\t");
+  
+  // Print the temperature.
+  if(isnan(temp)){ Serial.print("nan"); }
+  else{ Serial.print(temp); }
+  Serial.print("\t");
+  
+  // Print the pressure.
+  Serial.print(pres);
+  Serial.print("\t");
+  
+  // Print the relay states.
+  Serial.print(relay1_state);
+  Serial.print("\t");
+  Serial.print(relay2_state);
+  Serial.print("\n");
+#endif
+  
+  // Check if a delay is needed.
+  new_time = millis();
+  if(new_time-timestamp < READ_DELAY){
+    delay(READ_DELAY-(new_time-timestamp));
+  }
 }
