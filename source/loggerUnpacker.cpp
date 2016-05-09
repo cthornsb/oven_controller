@@ -26,12 +26,15 @@ int main(int argc, char *argv[]){
 		file.read((char*)(&relay2), 2);
 		if(file.eof()){ break; }
 		
+		// Convert the pressure voltage to an actual pressure.
+		pressure = pow(10.0, (pressure-5.0));
+		
 		std::cout << timestamp << "\t" << temperature << "\t" << pressure << "\t" << relay1 << "\t" << relay2 << std::endl;
 		
 		count++;
 	}
 	
-	std::cout << " Done! Read " << count << " data entries.\n";
+	std::cout << "\n Done! Read " << count << " data entries.\n";
 	
 	file.close();
 	

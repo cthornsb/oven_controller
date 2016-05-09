@@ -166,14 +166,10 @@ void loop() {
   int card_detect = digitalRead(CARD_DETECT_PIN);
 
   // Read the temperature from the thermocouple.
-  double temp = thermocouple.readCelsius();
+  float temp = thermocouple.readCelsius();
   
   // Read the pressure from the pressure gauge.
-  double pres = (analogRead(PRESSURE_PIN)/1023.0 - 1.0)*5.0;
-  
-  // Convert the pressure voltage to an actual pressure.
-  if(pres >= 0.0){ pres = pow(10.0, (float)pres); }
-  else{ pres = 1.0/pow(10.0, (float)(-1*pres)); }
+  float pres = 5.0*analogRead(PRESSURE_PIN)/1023.0;
   
   // Check for oven over temp.
   if(!over_temp){
