@@ -3,6 +3,8 @@
 #include <string.h>
 #include <cmath>
 
+#define RPRIME 0.5004367
+
 unsigned int timestamp;
 float temperature;
 float pressure;
@@ -34,6 +36,11 @@ int main(int argc, char *argv[]){
 		file.read((char*)(&relay1), 2);
 		file.read((char*)(&relay2), 2);
 		if(file.eof()){ break; }
+		
+		// A voltage divider is used in order to get the full
+		// range of 1-8 V from the pressure gauge using the
+		// 5 V arduino. Convert the pressure voltage to the real voltage.
+		pressure = pressure/RPRIME;
 		
 		// Convert the pressure voltage to an actual pressure.
 		pressure = pow(10.0, (pressure-5.0));
