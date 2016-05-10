@@ -14,17 +14,33 @@ short relay2;
 int main(int argc, char *argv[]){
 	if(argc < 2){ 
 		std::cout << " Invalid number of arguments.\n";
-		std::cout << "  SYNTAX: " << argv[0] << " <filename>\n";
+		std::cout << "  SYNTAX: " << argv[0] << " <input> [output]\n";
 		return 1; 
 	}
 
 	std::string ifname = std::string(argv[1]);
 	std::ifstream file(ifname.c_str(), std::ios::binary);
 	
-	if(!file.is_open()){ return 1; }
+	if(!file.is_open()){ 
+		std::cout << " ERROR: Failed to open input file '" << ifname << "'!\n";
+		return 1; 
+	}
 	
-	std::string ofname = ifname.substr(0, ifname.find_last_of('.'))+".csv";
+	std::string ofname;
+	if(argc > 2){ // User specified output filename.
+		ofname = std::string(argv[2]);
+	}
+	else{ // Get the output filename from the input filename.
+		ofname = ifname.substr(0, ifname.find_last_of('.'))+".csv";
+	}
+	
 	std::ofstream output(ofname.c_str());
+
+	if(!output.is_open()){ 
+		std::cout << " ERROR: Failed to open output file '" << ofname << "'!\n";
+		file.close();
+		return 1; 
+	}
 	
 	output << "time(ms)\tT(C)\tP(Torr)\tR1\tR2\n";
 	
@@ -51,7 +67,7 @@ int main(int argc, char *argv[]){
 	}
 	
 	std::cout << " Done! Read " << count << " data entries.\n";
-	std::cout << "  Wrote output file '" << ofname << "\n";
+	std::cout << "  Wrote output file '" << ofname << "'\n";
 	
 	file.close();
 	output.close();
