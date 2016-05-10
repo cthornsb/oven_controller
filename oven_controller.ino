@@ -171,10 +171,10 @@ void loop() {
   int card_detect = digitalRead(CARD_DETECT_PIN);
 
   // Read the temperature from the thermocouple.
-  float temp = thermocouple.readCelsius();
+  double temp = thermocouple.readCelsius();
   
   // Read the pressure from the pressure gauge.
-  float pres = 5.0*analogRead(PRESSURE_PIN)/1023.0;
+  double pres = 5.0*analogRead(PRESSURE_PIN)/1023.0;
   
   // Check for oven over temp.
   if(!over_temp){
@@ -234,7 +234,7 @@ void loop() {
   }
 #ifdef USE_SERIAL
   // Print the time.
-  Serial.print(time);
+  Serial.print(timestamp);
   Serial.print("\t");
   
   // Print the temperature.
