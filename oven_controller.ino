@@ -2,7 +2,8 @@
 #include "SdFat.h"
 #include "Adafruit_MAX31855.h"
 
-//#define USE_SERIAL
+//#define USE_SERIAL_ASCII
+#define USE_SERIAL_BINARY
 
 // Set the chip select pins.
 #define THERMO_CHIPSELECT 4
@@ -31,6 +32,9 @@
 
 // Time (in milliseconds) to wait between read cycles.
 #define READ_DELAY 1000
+
+// The delimiter between data packets.
+const unsigned long delimiter = 0xFFFFFFFF;
 
 // The time since the program started.
 unsigned long timestamp;
@@ -69,6 +73,22 @@ void writeBytes(byte *val_, const byte &len_){
   }
 }
 
+// Write len_ bytes to the Serial output.
+void writeBytesSerial(byte *val_, const byte &len_){
+#ifdef USE_SERIAL_BINARY
+  if(!val_ || len_==0){ return; }
+  
+  long container;
+  memcpy((byte*)&container, val_, len_);
+  
+  byte current;
+  for(byte index = 0; index < len_; index++){
+    current = (container >> 8*index) & 0xFF;
+    Serial.write(current);
+  }
+#endif
+}
+
 void openFile(){
   if(!sd_card_okay){ return; }
   
@@ -86,7 +106,7 @@ void openFile(){
     if (!sd.exists(filename)) { break; }
   }
 
-#ifdef USE_SERIAL     
+#ifdef USE_SERIAL_ASCII    
   // Print the new filename to the serial monitor.
   Serial.print("Opening SD file ");
   Serial.print(filename);
@@ -96,12 +116,14 @@ void openFile(){
   // Open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
   if (file.open(filename, O_CREAT | O_WRITE | O_EXCL)) {
-#ifdef USE_SERIAL     
+    // Write the packet delimiter to start the file.
+    writeBytes((byte*)&delimiter, 4);
+#ifdef USE_SERIAL_ASCII     
     Serial.println("done.");
 #endif
   }
   else{
-#ifdef USE_SERIAL     
+#ifdef USE_SERIAL_ASCII     
     Serial.println("failed!");
 #endif
   }
@@ -110,7 +132,7 @@ void openFile(){
 void initSD(){
   if(sd_card_okay){ return; }
 
-#ifdef USE_SERIAL     
+#ifdef USE_SERIAL_ASCII     
   Serial.print("Initializing SD card... ");
 #endif
   
@@ -118,12 +140,12 @@ void initSD(){
   pinMode(10, OUTPUT);
 
   if(sd.begin(SD_CHIPSELECT, SPI_HALF_SPEED)){
-#ifdef USE_SERIAL     
+#ifdef USE_SERIAL_ASCII     
     Serial.println("done.");
 #endif     
   }
   else{
-#ifdef USE_SERIAL     
+#ifdef USE_SERIAL_ASCII     
     Serial.println("failed!");
 #endif
     return;  
@@ -147,12 +169,14 @@ void setup() {
   pinMode(RELAY_1_OUT, OUTPUT);
   pinMode(RELAY_2_OUT, OUTPUT);
 
-#ifdef USE_SERIAL
+#if defined(USE_SERIAL_ASCII) || defined(USE_SERIAL_BINARY)
   // Open serial communications and wait for port to open.
   Serial.begin(9600);
-  
+
+  #ifdef USE_SERIAL_ASCII  
   // Inform the user that we've started.
   Serial.print("time(ms)\tT(C)\tP(V)\tR1\tR2\n");
+  #endif
 #endif
 
   // Check for inserted SD card.
@@ -212,6 +236,9 @@ void loop() {
 
   // Write to file/serial.
   if(sd_card_okay){ // Write to the sd card.
+    // Write the packet delimiter.
+    writeBytes((byte*)&delimiter, 4);
+
     // Write the time.
     writeBytes((byte*)&timestamp, 4);
   
@@ -227,12 +254,12 @@ void loop() {
     
     // Force data to SD and update the directory entry to avoid data loss.
     if (!file.sync() || file.getWriteError()) {
-#ifdef USE_SERIAL
+#ifdef USE_SERIAL_ASCII
       Serial.println("Failed to sync to SD file!");
 #endif
     }
   }
-#ifdef USE_SERIAL
+#ifdef USE_SERIAL_ASCII
   // Print the time.
   Serial.print(timestamp);
   Serial.print("\t");
@@ -251,6 +278,22 @@ void loop() {
   Serial.print("\t");
   Serial.print(relay2_state);
   Serial.print("\n");
+#elif defined(USE_SERIAL_BINARY)
+  // Write the packet delimiter.
+  writeBytesSerial((byte*)&delimiter, 4);
+
+  // Write the time.
+  writeBytesSerial((byte*)&timestamp, 4);
+
+  // Write the temperature.
+  writeBytesSerial((byte*)&temp, 4);
+
+  // Write the pressure.
+  writeBytesSerial((byte*)&pres, 4);
+
+  // Write the relay states.
+  writeBytesSerial((byte*)&relay1_state, 2);
+  writeBytesSerial((byte*)&relay2_state, 2);
 #endif
   
   // Check if a delay is needed.
