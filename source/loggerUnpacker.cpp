@@ -13,9 +13,6 @@
 
 #define RPRIME 0.5004367
 
-typedef unsigned int UWORD4;
-typedef unsigned short UWORD2;
-
 unsigned int delimiter;
 unsigned int timestamp;
 float temperature;
@@ -80,18 +77,14 @@ size_t serialRead(const int &fd_, std::deque<char> &data_, const size_t &len_){
 	return values;
 }
 
-void getDataWord4(const std::deque<char> &data_, const size_t &offset_, UWORD4 *val_){
-	if(offset_+4 > data_.size()){ return; }
+void getDataWord(const std::deque<char> &data_, const size_t &offset_, char *val_, const size_t &len_=4){
+	if(offset_+len_ > data_.size()){ return; }
 	
-	char temp[4] = { data_[offset_], data_[offset_+1], data_[offset_+2], data_[offset_+3] };
-	memcpy((char*)val_, temp, 4);
-}
-
-void getDataWord2(const std::deque<char> &data_, const size_t &offset_, UWORD2 *val_){
-	if(offset_+2 > data_.size()){ return; }
-	
-	char temp[2] = { data_[offset_], data_[offset_+1] };
-	memcpy((char*)val_, temp, 2);
+	char temp[len_];
+	for(size_t i = 0; i < len_; i++){
+		temp[i] = data_[offset_+i];
+	}
+	memcpy(val_, temp, len_);
 }
 
 void popQueue(std::deque<char> &data_, const size_t &len_){
@@ -226,7 +219,7 @@ int main(int argc, char *argv[]){
 
 			if(!ascii_mode){ // Reading binary from serial.
 				// Check that we are not out of sync by up to 3 bytes.
-				// Check for 0xFF bytes in a row. This will signify
+				// Check for 4 0xFF bytes in a row. This will signify
 				// the beginning of a data packet.
 				if(serialRead(fd, data, bytesReady) < 0){
 					std::cout << " ERROR: Encountered error reading on serial port!\n";
@@ -239,26 +232,21 @@ int main(int argc, char *argv[]){
 							break;
 						}
 				
-						if(data.front() != -1){
-							data.pop_front();
-							continue;
-						}
-					
-						UWORD4 dummy;
-						getDataWord4(data, 0, &dummy);
+						unsigned int dummy;
+						getDataWord(data, 0, (char*)&dummy);
 						if(dummy == 0xFFFFFFFF){
 							break;
 						} 
-						else{ std::cout << "0x" << std::hex << dummy << std::dec << std::endl; }
+						else{ data.pop_front(); }
 					}
 					
 					if(data.size() >= 20){ // Read the data.
-						getDataWord4(data, 0, (UWORD4*)&delimiter);
-						getDataWord4(data, 4, (UWORD4*)&timestamp);
-						getDataWord4(data, 8, (UWORD4*)&temperature);
-						getDataWord4(data, 12, (UWORD4*)&pressure);
-						getDataWord2(data, 16, (UWORD2*)&relay1);
-						getDataWord2(data, 18, (UWORD2*)&relay2);
+						getDataWord(data, 0, (char*)&delimiter);
+						getDataWord(data, 4, (char*)&timestamp);
+						getDataWord(data, 8, (char*)&temperature);
+						getDataWord(data, 12, (char*)&pressure);
+						getDataWord(data, 16, (char*)&relay1, 2);
+						getDataWord(data, 18, (char*)&relay2, 2);
 						
 						// Remove the data from the queue.
 						popQueue(data, 20);
