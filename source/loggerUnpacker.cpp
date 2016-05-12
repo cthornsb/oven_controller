@@ -84,9 +84,9 @@ void replaceChar(char *str_, const size_t &len_, const char &c1_, const char &c2
 }
 
 // Return the order of magnitude of a number
-float getOrder(const float &input_, unsigned int &power){
-	float test = 1;
-	for(unsigned int i = 0; i < 100; i++){
+float getOrder(const float &input_, int &power){
+	float test = 1E-10;
+	for(int i = -10; i < 10; i++){
 		if(input_/test <= 1){ 
 			power = i;
 			return test; 
@@ -98,7 +98,7 @@ float getOrder(const float &input_, unsigned int &power){
 
 // Return a scientific notation representation of an input number.
 std::string sciNotation(const float &input_, const size_t &N_=2){
-	unsigned int power = 0;
+	int power = 0;
 	double order = getOrder(input_, power);
 	
 	std::stringstream stream;
@@ -315,8 +315,8 @@ int main(int argc, char *argv[]){
 		// Print data to the screen.
 		if(printout){
 			std::cout << " time = " << timestamp/1000 << " s, temp = " << temperature << " C, pres = ";
-			std::cout << pressureString << " Torr, R1 = " << relay1 << ", R2 = " << relay2 << std::endl;//"\r";
-			//std::cout << std::flush;
+			std::cout << pressureString << " Torr, R1 = " << relay1 << ", R2 = " << relay2 << "\r";
+			std::cout << std::flush;
 		}
 		
 		// Write ascii data to the output file.
