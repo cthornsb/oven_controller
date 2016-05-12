@@ -5,6 +5,7 @@
 #include <cmath>
 #include <stdio.h>
 #include <unistd.h>
+#include <sstream>
 
 #include <signal.h>
 #include <stdexcept>
@@ -35,25 +36,6 @@ void setup_signal_handlers(){
 		}
 	}
 }
-
-/*int serialOpenB(const char *device, const int baud, const int max=1000){
-	struct termios options ;
-	int fd = serialOpen(device, baud);
-	
-	// Get and modify current options:
-	tcgetattr(fd, &options);
-	
-	options.c_lflag |= ICANON; // set canonical mode (line by line)
-	options.c_iflag |= IGNCR; // ignore CR on input
-	options.c_cc [VMIN] = max-1; // return if max-1 bytes received
-	options.c_cc [VTIME] = 0; // no timeout
-	
-	tcsetattr(fd, TCSANOW | TCSAFLUSH, &options);
-	
-	usleep(10000); // 10mS
-	
-	return fd ;
-}*/
 
 size_t serialGets(const int &fd_, char *buf_, const size_t &len_){
 	int numBytes = read(fd_, buf_, len_-1);
@@ -99,6 +81,44 @@ void replaceChar(char *str_, const size_t &len_, const char &c1_, const char &c2
 	for(size_t index = 0; index < len_; index++){
 		if(str_[index] == c1_){ str_[index] = c2_; }
 	}
+}
+
+// Return the order of magnitude of a number
+float getOrder(const float &input_, unsigned int &power){
+	float test = 1;
+	for(unsigned int i = 0; i < 100; i++){
+		if(input_/test <= 1){ 
+			power = i;
+			return test; 
+		}
+		test *= 10.0;
+	}
+	return 1.0;
+}
+
+// Return a scientific notation representation of an input number.
+std::string sciNotation(const float &input_, const size_t &N_=2){
+	unsigned int power = 0;
+	double order = getOrder(input_, power);
+	
+	std::stringstream stream;
+	stream << 10*input_/order;
+	
+	// Limit to N_ decimal places due to space constraints
+	std::string output = stream.str();
+	size_t find_index = output.find('.');
+	if(find_index != std::string::npos){
+		std::string temp;
+		temp = output.substr(0, find_index);
+		temp += output.substr(find_index, N_+1);
+		output = temp;
+	}
+
+	std::stringstream stream2;
+	stream2 << output << "E" << power-1; 
+	output = stream2.str();
+
+	return output;
 }
 
 void help(char * prog_name_){
@@ -289,16 +309,20 @@ int main(int argc, char *argv[]){
 		// Convert the pressure voltage to an actual pressure.
 		pressure = pow(10.0, (pressure-5.0));
 
+		// Get a string of the pressure in scientific notation.
+		std::string pressureString = sciNotation(pressure);
+
 		// Print data to the screen.
 		if(printout){
-			std::cout << " time = " << timestamp/1000 << " s, temp = " << temperature << " C, pres = " << pressure*1000 << " mTorr, R1 = " << relay1 << ", R2 = " << relay2 << std::endl;//"\r";
+			std::cout << " time = " << timestamp/1000 << " s, temp = " << temperature << " C, pres = ";
+			std::cout << pressureString << " Torr, R1 = " << relay1 << ", R2 = " << relay2 << std::endl;//"\r";
 			//std::cout << std::flush;
 		}
 		
 		// Write ascii data to the output file.
 		output << timestamp << ",";
 		output << temperature << ",";
-		output << pressure << ",";
+		output << pressureString << ",";
 		output << relay1 << ",";
 		output << relay2 << "\n";
 
