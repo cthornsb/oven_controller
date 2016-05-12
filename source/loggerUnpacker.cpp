@@ -1,10 +1,9 @@
 #include <iostream>
 #include <fstream>
+#include <deque>
 #include <string.h>
-#include <vector>
 #include <cmath>
 #include <stdio.h>
-#include <termios.h>
 #include <unistd.h>
 
 #include <signal.h>
@@ -13,6 +12,9 @@
 #include "wiringSerial.h"
 
 #define RPRIME 0.5004367
+
+typedef unsigned int UWORD4;
+typedef unsigned short UWORD2;
 
 unsigned int delimiter;
 unsigned int timestamp;
@@ -37,7 +39,7 @@ void setup_signal_handlers(){
 	}
 }
 
-int serialOpenB(const char *device, const int baud, const int max=1000){
+/*int serialOpenB(const char *device, const int baud, const int max=1000){
 	struct termios options ;
 	int fd = serialOpen(device, baud);
 	
@@ -54,7 +56,7 @@ int serialOpenB(const char *device, const int baud, const int max=1000){
 	usleep(10000); // 10mS
 	
 	return fd ;
-}
+}*/
 
 size_t serialGets(const int &fd_, char *buf_, const size_t &len_){
 	int numBytes = read(fd_, buf_, len_-1);
@@ -64,6 +66,40 @@ size_t serialGets(const int &fd_, char *buf_, const size_t &len_){
 
 size_t serialRead(const int &fd_, char *val_, const size_t &len_){
 	return read(fd_, val_, len_);
+}
+
+size_t serialRead(const int &fd_, std::deque<char> &data_, const size_t &len_){
+	char dummy;
+	size_t values = 0;
+	for(size_t i = 0; i < len_; i++){
+		if(read(fd_, &dummy, 1) == 1){ 
+			data_.push_back(dummy); 
+			values++;
+		}
+	}
+	return values;
+}
+
+void getDataWord4(const std::deque<char> &data_, const size_t &offset_, UWORD4 *val_){
+	if(offset_+4 > data_.size()){ return; }
+	
+	char temp[4] = { data_[offset_], data_[offset_+1], data_[offset_+2], data_[offset_+3] };
+	memcpy((char*)val_, temp, 4);
+}
+
+void getDataWord2(const std::deque<char> &data_, const size_t &offset_, UWORD2 *val_){
+	if(offset_+2 > data_.size()){ return; }
+	
+	char temp[2] = { data_[offset_], data_[offset_+1] };
+	memcpy((char*)val_, temp, 2);
+}
+
+void popQueue(std::deque<char> &data_, const size_t &len_){
+	size_t count = 0;
+	while(!data_.empty() && count < len_){
+		data_.pop_front();
+		count++;
+	}
 }
 
 void replaceChar(char *str_, const size_t &len_, const char &c1_, const char &c2_){
@@ -86,7 +122,9 @@ int main(int argc, char *argv[]){
 		help(argv[0]);
 		return 1;
 	}
-
+	
+	std::string ifname = std::string(argv[1]);
+	std::string ofname = ifname.substr(0, ifname.find_last_of('.'))+".csv";
 	bool serial_mode = false;
 	bool ascii_mode = false;
 	bool printout = false;
@@ -95,20 +133,24 @@ int main(int argc, char *argv[]){
 		if(strcmp(argv[index], "--print") == 0){
 			printout = true;
 		}
-		if(strcmp(argv[index], "--serial") == 0){
+		else if(strcmp(argv[index], "--serial") == 0){
+			std::cout << " Using serial mode.\n";
 			serial_mode = true;
 		}
-		if(strcmp(argv[index], "--ascii") == 0){
+		else if(strcmp(argv[index], "--ascii") == 0){
+			std::cout << " Using ascii mode.\n";
 			ascii_mode = true;
 			serial_mode = true;
+		}
+		else{ // Unrecognized command, must be the output filename.
+			ofname = std::string(argv[index]); 
 		}
 		index++;
 	}
 
 	// Load the input file.
-	std::string ifname = std::string(argv[1]);
 	std::ifstream file;
-	int fd;
+	int fd = 0;
 
 	if(!serial_mode){
 		file.open(argv[1], std::ios::binary);
@@ -118,7 +160,7 @@ int main(int argc, char *argv[]){
 		}
 	}
 	else{
-		fd = serialOpenB(argv[1], 9600);
+		fd = serialOpen(argv[1], 9600);
 		if(fd < 0){
 			std::cout << " ERROR: Failed to open serial port '" << argv[1] << "'!\n";
 			return 1; 
@@ -126,15 +168,7 @@ int main(int argc, char *argv[]){
 		else{ std::cout << " Connected to " << argv[1] << " (fd=" << fd << ")\n"; }
 	}
 
-	std::string ofname;
-	if(argc > 2){ // User specified output filename.
-		ofname = std::string(argv[2]);
-	}
-	else{ // Get the output filename from the input filename.
-		ofname = ifname.substr(0, ifname.find_last_of('.'))+".csv";
-	}
-	
-	std::ofstream output(ofname.c_str());
+	std::ofstream output(ofname.c_str(), std::ios::binary);
 
 	if(!output.is_open()){ 
 		std::cout << " ERROR: Failed to open output file '" << ofname << "'!\n";
@@ -149,6 +183,7 @@ int main(int argc, char *argv[]){
 	
 	bool firstRun = true;
 	unsigned int count = 0;
+	std::deque<char> data;
 	while(true){
 		if(SIGNAL_INTERRUPT){
 			break;
@@ -179,7 +214,7 @@ int main(int argc, char *argv[]){
 			}
 
 			int bytesReady = serialDataAvail(fd);
-			if(bytesReady == 0){ // No bytes waiting to be read.
+			if(bytesReady == 0){ // Not enough bytes waiting to be read.
 				// Wait for 10 ms for some bytes to read.
 				usleep(10000);
 				continue;
@@ -190,23 +225,47 @@ int main(int argc, char *argv[]){
 			}			
 
 			if(!ascii_mode){ // Reading binary from serial.
-				if(serialRead(fd, (char*)&delimiter, 4) < 0){
+				// Check that we are not out of sync by up to 3 bytes.
+				// Check for 0xFF bytes in a row. This will signify
+				// the beginning of a data packet.
+				if(serialRead(fd, data, bytesReady) < 0){
 					std::cout << " ERROR: Encountered error reading on serial port!\n";
 					break;
 				}
-		
-				// Check for the beginning of a new packet.
-				if(delimiter != 0xFFFFFFFF){ continue; }
-		
-				// Read data from the file.
-				if(serialRead(fd, (char*)&timestamp, 4) < 0 ||
-				   serialRead(fd, (char*)&temperature, 4) < 0 ||
-				   serialRead(fd, (char*)&pressure, 4) < 0 ||
-				   serialRead(fd, (char*)&relay1, 2) < 0 ||
-				   serialRead(fd, (char*)&relay2, 2) < 0){
-					std::cout << " ERROR: Encountered error reading on serial port!\n";
-					break;
+
+				if(data.size() >= 20){ // Scan the data.				
+					while(!data.empty()){
+						if(SIGNAL_INTERRUPT){
+							break;
+						}
+				
+						if(data.front() != -1){
+							data.pop_front();
+							continue;
+						}
+					
+						UWORD4 dummy;
+						getDataWord4(data, 0, &dummy);
+						if(dummy == 0xFFFFFFFF){
+							break;
+						} 
+						else{ std::cout << "0x" << std::hex << dummy << std::dec << std::endl; }
+					}
+					
+					if(data.size() >= 20){ // Read the data.
+						getDataWord4(data, 0, (UWORD4*)&delimiter);
+						getDataWord4(data, 4, (UWORD4*)&timestamp);
+						getDataWord4(data, 8, (UWORD4*)&temperature);
+						getDataWord4(data, 12, (UWORD4*)&pressure);
+						getDataWord2(data, 16, (UWORD2*)&relay1);
+						getDataWord2(data, 18, (UWORD2*)&relay2);
+						
+						// Remove the data from the queue.
+						popQueue(data, 20);
+					}
+					else{ continue; }
 				}
+				else{ continue; }
 			}
 			else{ // Reading ascii from serial.
 				char *msg = new char[bytesReady+1];
@@ -225,6 +284,9 @@ int main(int argc, char *argv[]){
 				replaceChar(msg, bytesReady+1, '\t', ',');
 				output << msg;
 
+				// Delete the string.
+				delete[] msg;
+
 				// Do no further processing.
 				count++;
 				continue;
@@ -241,8 +303,8 @@ int main(int argc, char *argv[]){
 
 		// Print data to the screen.
 		if(printout){
-			std::cout << " time = " << timestamp/1000 << " s, temp = " << temperature << " C, pres = " << pressure*1000 << " mTorr, R1 = " << relay1 << ", R2 = " << relay2 << "\r";
-			std::cout << std::flush;
+			std::cout << " time = " << timestamp/1000 << " s, temp = " << temperature << " C, pres = " << pressure*1000 << " mTorr, R1 = " << relay1 << ", R2 = " << relay2 << std::endl;//"\r";
+			//std::cout << std::flush;
 		}
 		
 		// Write ascii data to the output file.
