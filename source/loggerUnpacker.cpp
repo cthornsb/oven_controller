@@ -161,6 +161,14 @@ int main(int argc, char *argv[]){
 		index++;
 	}
 
+	// Load the output file.
+	std::ofstream output(ofname.c_str(), std::ios::binary);
+
+	if(!output.is_open()){ 
+		std::cout << " ERROR: Failed to open output file '" << ofname << "'!\n";
+		return 1; 
+	}
+
 	// Load the input file.
 	std::ifstream file;
 	int fd = 0;
@@ -169,6 +177,7 @@ int main(int argc, char *argv[]){
 		file.open(argv[1], std::ios::binary);
 		if(!file.is_open()){ 
 			std::cout << " ERROR: Failed to open input file '" << argv[1] << "'!\n";
+			output.close();
 			return 1; 
 		}
 	}
@@ -176,18 +185,10 @@ int main(int argc, char *argv[]){
 		fd = serialOpen(argv[1], 9600);
 		if(fd < 0){
 			std::cout << " ERROR: Failed to open serial port '" << argv[1] << "'!\n";
+			output.close();
 			return 1; 
 		}
 		else{ std::cout << " Connected to " << argv[1] << " (fd=" << fd << ")\n"; }
-	}
-
-	std::ofstream output(ofname.c_str(), std::ios::binary);
-
-	if(!output.is_open()){ 
-		std::cout << " ERROR: Failed to open output file '" << ofname << "'!\n";
-		if(!serial_mode){ file.close(); }
-		else{ serialClose(fd); }
-		return 1; 
 	}
 
 	setup_signal_handlers();
