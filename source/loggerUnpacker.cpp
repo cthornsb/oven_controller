@@ -139,34 +139,48 @@ int main(int argc, char *argv[]){
 	}
 	
 	std::string ifname = std::string(argv[1]);
-	std::string ofname = ifname.substr(0, ifname.find_last_of('.'))+".csv";
+	std::string ofname; 
+	
 	bool serial_mode = false;
 	bool ascii_mode = false;
 	bool ping_mode = false;
 	bool printout = false;
 	int num_ping = -1;
+	
+	if(ifname.find("/dev/") == std::string::npos){
+		ofname = ifname.substr(0, ifname.find_last_of('.'))+".csv";
+	}
+	else{
+		std::cout << " Using serial readout mode.\n";
+		ofname = "./logger.csv";
+		serial_mode = true;
+	}
+	
 	int index = 2;
 	while(index < argc){
 		if(strcmp(argv[index], "--print") == 0){
 			printout = true;
 		}
-		else if(strcmp(argv[index], "--serial") == 0){
-			std::cout << " Using serial mode.\n";
-			serial_mode = true;
-		}
 		else if(strcmp(argv[index], "--ascii") == 0){
+			if(!serial_mode){
+				std::cout << " Error! May only use ascii mode with serial .\n";
+				return 1;
+			}
 			std::cout << " Using ascii mode.\n";
 			ascii_mode = true;
-			serial_mode = true;
 		}
 		else if(strcmp(argv[index], "--ping") == 0){
-			if(index + 1 >= argc){
+			if(!serial_mode){
+				std::cout << " Error! May only use ascii mode with serial port.\n";
+				return 1;
+			}
+			else if(index + 1 >= argc){
 				std::cout << " Error! Missing required argument to '--ping'!\n";
 				help(argv[0]);
 				return 1;
 			}
+			
 			num_ping = atoi(argv[++index]);
-			serial_mode = true;
 			ping_mode = true;
 			printout = true;
 			if(num_ping <= 0){
