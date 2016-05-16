@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sstream>
+#include <stdlib.h>
 
 #include <signal.h>
 #include <stdexcept>
@@ -124,9 +125,10 @@ std::string sciNotation(const float &input_, const size_t &N_=2){
 void help(char * prog_name_){
 	std::cout << "  SYNTAX: " << prog_name_ << " <filename> [options] [output]\n";
 	std::cout << "   Available options:\n";
-	std::cout << "    --print  | Print unpacked data to stdout.\n";
-	std::cout << "    --serial | Read data from a serial port.\n";
-	std::cout << "    --ascii  | Read ascii from the serial port.\n";
+	std::cout << "    --print      | Print unpacked data to stdout.\n";
+	std::cout << "    --serial     | Read data from a serial port.\n";
+	std::cout << "    --ascii      | Read ascii from the serial port.\n";
+	std::cout << "    --ping <num> | Ping serial port and display readings.\n";
 }
 
 int main(int argc, char *argv[]){
@@ -140,7 +142,9 @@ int main(int argc, char *argv[]){
 	std::string ofname = ifname.substr(0, ifname.find_last_of('.'))+".csv";
 	bool serial_mode = false;
 	bool ascii_mode = false;
+	bool ping_mode = false;
 	bool printout = false;
+	int num_ping = -1;
 	int index = 2;
 	while(index < argc){
 		if(strcmp(argv[index], "--print") == 0){
@@ -155,6 +159,22 @@ int main(int argc, char *argv[]){
 			ascii_mode = true;
 			serial_mode = true;
 		}
+		else if(strcmp(argv[index], "--ping") == 0){
+			if(index + 1 >= argc){
+				std::cout << " Error! Missing required argument to '--ping'!\n";
+				help(argv[0]);
+				return 1;
+			}
+			num_ping = atoi(argv[++index]);
+			serial_mode = true;
+			ping_mode = true;
+			printout = true;
+			if(num_ping <= 0){
+				std::cout << " Error! Number of ping attempts must be greater than zero!\n";
+				return 1;
+			}
+			std::cout << "--Pinging device " << num_ping << " times.--\n";
+		}
 		else{ // Unrecognized command, must be the output filename.
 			ofname = std::string(argv[index]); 
 		}
@@ -162,11 +182,14 @@ int main(int argc, char *argv[]){
 	}
 
 	// Load the output file.
-	std::ofstream output(ofname.c_str(), std::ios::binary);
-
-	if(!output.is_open()){ 
-		std::cout << " ERROR: Failed to open output file '" << ofname << "'!\n";
-		return 1; 
+	std::ofstream output;
+	
+	if(!ping_mode){
+		output.open(ofname.c_str(), std::ios::binary);
+		if(!output.is_open()){ 
+			std::cout << " ERROR: Failed to open output file '" << ofname << "'!\n";
+			return 1; 
+		}
 	}
 
 	// Load the input file.
@@ -226,7 +249,7 @@ int main(int argc, char *argv[]){
 				serialFlush(fd);
 				firstRun = false;
 			}
-
+			
 			int bytesReady = serialDataAvail(fd);
 			if(bytesReady == 0){ // Not enough bytes waiting to be read.
 				// Wait for 10 ms for some bytes to read.
@@ -236,7 +259,11 @@ int main(int argc, char *argv[]){
 			else if(bytesReady < 0){ // Error on port.
 				std::cout << " ERROR: Encountered error on serial port!\n";
 				break;
-			}			
+			}		
+
+			if(ping_mode && num_ping-- <= 0){
+				break;
+			}
 
 			if(!ascii_mode){ // Reading binary from serial.
 				// Check that we are not out of sync by up to 3 bytes.
@@ -315,29 +342,35 @@ int main(int argc, char *argv[]){
 
 		// Print data to the screen.
 		if(printout){
+			if(ping_mode){ std::cout << " ping " << num_ping+1 << ":"; }
 			std::cout << " time = " << timestamp/1000 << " s, temp = " << temperature << " C, pres = ";
-			std::cout << pressureString << " Torr, R1 = " << relay1 << ", R2 = " << relay2 << "\r";
-			std::cout << std::flush;
+			std::cout << pressureString << " Torr, R1 = " << relay1 << ", R2 = " << relay2;
+			if(!ping_mode){ std::cout << "\r" << std::flush; }
+			else{ std::cout << "\n"; }
 		}
 		
-		// Write ascii data to the output file.
-		output << timestamp << ",";
-		output << temperature << ",";
-		output << pressureString << ",";
-		output << relay1 << ",";
-		output << relay2 << "\n";
+		if(!ping_mode){
+			// Write ascii data to the output file.
+			output << timestamp << ",";
+			output << temperature << ",";
+			output << pressureString << ",";
+			output << relay1 << ",";
+			output << relay2 << "\n";
+		}
 
 		count++;
 	}
 	
 	std::cout << "\n Done! Read " << count << " data entries.\n";
-	std::cout << "  Wrote output file '" << ofname << "'\n";
 	
 	// Close the input file/port.
 	if(!serial_mode){ file.close(); }
 	else{ serialClose(fd); }
 
-	output.close();
+	if(!ping_mode){
+		std::cout << "  Wrote output file '" << ofname << "'\n";
+		output.close();
+	}
 
 	return 0;
 }
