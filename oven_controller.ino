@@ -231,6 +231,15 @@ void loop() {
   }
   else if(sd_card_okay && card_detect == 0){ // Check for removed SD card.
     sd_card_okay = false;
+    
+    // Force data to SD and update the directory entry to avoid data loss.
+    if (!file.sync() || file.getWriteError()) {
+#ifdef USE_SERIAL_ASCII
+      Serial.println("Failed to sync to SD file!");
+#endif
+    }
+    
+    // Close the SD file.
     file.close();
   }
 
@@ -251,13 +260,6 @@ void loop() {
     // Write the relay states.
     writeBytes((byte*)&relay1_state, 2);
     writeBytes((byte*)&relay2_state, 2);
-    
-    // Force data to SD and update the directory entry to avoid data loss.
-    if (!file.sync() || file.getWriteError()) {
-#ifdef USE_SERIAL_ASCII
-      Serial.println("Failed to sync to SD file!");
-#endif
-    }
   }
 #ifdef USE_SERIAL_ASCII
   // Print the time.
