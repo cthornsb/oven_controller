@@ -27,8 +27,8 @@
 #define CARD_DETECT_PIN 2
 
 // Set the oven temperature control values.
-#define OVEN_MAX_TEMP 79.0
-#define OVEN_MIN_TEMP 77.0
+#define OVEN_MAX_TEMP 89.0
+#define OVEN_MIN_TEMP 88.0
 
 // Time (in milliseconds) to wait between read cycles.
 #define READ_DELAY 1000
