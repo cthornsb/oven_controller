@@ -1,4 +1,9 @@
 loggerUnpacker
+csvReader
+processor
 
+*.root
+*.pdf
+*.tar
 *.csv
 *.o

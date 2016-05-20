@@ -7,12 +7,14 @@ ARDUINO_LIB_DIR = $(HOME)/Arduino/libraries
 
 COMPILER = g++
 CFLAGS = -Wall -O -Iinclude
+RFLAGS = `root-config --cflags --glibs`
 
 # Directories
 TOP_LEVEL = $(shell pwd)
 INCLUDE_DIR = $(TOP_LEVEL)/include
 SOURCE_DIR = $(TOP_LEVEL)/source
 OBJ_DIR = $(TOP_LEVEL)/obj
+EXEC_DIR = $(TOP_LEVEL)/exec
 THERMOCOUPLE_LIB = $(TOP_LEVEL)/Adafruit_MAX31855.tar
 THERMOCOUPLE_LIB_DIR = $(ARDUINO_LIB_DIR)/Adafruit_MAX31855
 SDFAT_LIB = $(TOP_LEVEL)/greiman_SdFat.tar
@@ -24,11 +26,19 @@ SERIAL_OBJ = $(OBJ_DIR)/wiringSerial.o
 
 # Unpacker tool source.
 UNPACKER_SRC = $(SOURCE_DIR)/loggerUnpacker.cpp
-UNPACKER_EXE = $(TOP_LEVEL)/loggerUnpacker
+UNPACKER_EXE = $(EXEC_DIR)/loggerUnpacker
+
+# File reader tool source.
+READER_SRC = $(SOURCE_DIR)/csvReader.cpp
+READER_EXE = $(EXEC_DIR)/csvReader
+
+# Data logger processor tool source.
+PROCESSOR_SRC = $(SOURCE_DIR)/processor.cpp
+PROCESSOR_EXE = $(EXEC_DIR)/processor
 
 ########################################################################
 
-all: install unpacker
+all: install $(OBJ_DIR) $(EXEC_DIR) $(UNPACKER_EXE) $(READER_EXE) $(PROCESSOR_EXE)
 
 ########################################################################
 
@@ -39,17 +49,32 @@ $(OBJ_DIR):
 		mkdir $@; \
 	fi
 
+$(EXEC_DIR):
+#	Make the object file directory
+	@if [ ! -d $@ ]; then \
+		echo "Making directory: "$@; \
+		mkdir $@; \
+	fi
+
 ########################################################################
 
 $(OBJ_DIR)/%.o: $(SOURCE_DIR)/%.c
 #	Compile C source files
-	$(COMPILER) -c $(CFLAGS) -Iinclude -I$(PIXIE_SUITE_DIR)/exec/include $< -o $@
+	$(COMPILER) -c $(CFLAGS) -Iinclude $< -o $@
 
 ########################################################################
 
-unpacker: $(OBJ_DIR) $(SERIAL_OBJ) $(UNPACKER_SRC)
+$(UNPACKER_EXE): $(SERIAL_OBJ) $(UNPACKER_SRC)
 #	Compile unpacker tool.
-	$(COMPILER) $(CFLAGS) -o $(UNPACKER_EXE) $(SERIAL_OBJ) $(UNPACKER_SRC)
+	$(COMPILER) $(CFLAGS) -o $@ $(SERIAL_OBJ) $(UNPACKER_SRC)
+
+$(READER_EXE): $(READER_SRC)
+#	Compile unpacker tool.
+	$(COMPILER) $(CFLAGS) -o $@ $(READER_SRC)
+
+$(PROCESSOR_EXE): $(EXEC_DIR) $(PROCESSOR_SRC)
+#	Compile unpacker tool.
+	$(COMPILER) $(CFLAGS) -o $@ $(PROCESSOR_SRC) $(RFLAGS)
 
 ########################################################################
 
@@ -70,15 +95,16 @@ install:
 		echo " ERROR: directory "$(ARDUINO_LIB_DIR)" does not exist!"; \
 	fi
 
-########################################################################
-
-clean:
-	@echo " Removing compiled files"
-	@rm -f $(UNPACKER_EXE) $(OBJ_DIR)/*.o
-
-clean_lib:
+uninstall:
 	@echo " Removing installed library files"
 	@rm -rf $(THERMOCOUPLE_LIB_DIR)/*
 	@rmdir $(THERMOCOUPLE_LIB_DIR)
 	@rm -rf $(SDFAT_LIB_DIR)/*
 	@rmdir $(SDFAT_LIB_DIR)
+
+########################################################################
+
+clean:
+	@echo " Removing compiled files"
+	@rm -f $(OBJ_DIR)/*.o
+	@rm -f $(EXEC_DIR)/*
