@@ -37,12 +37,15 @@
 // Time (in milliseconds) to wait between read cycles.
 #define READ_DELAY 1000
 
+// Maximum time to write to SD file output (ms).
+#define MAX_WRITE_TIME 86400000
+
 // The delimiter between data packets.
 const unsigned long delimiter = 0xFFFFFFFF;
 
 // The time since the program started.
-unsigned long timestamp;
-unsigned long new_time;
+unsigned long timestamp = 0;
+unsigned long new_time = 0;
 
 // Variables to track 120V relay states.
 int prev_relay1_state = 0;
@@ -232,14 +235,11 @@ void loop() {
   // Check for over pressure state.
   if(pres > OVEN_MAX_PRESSURE){
     if(pumped_down){
-      // EMERGENCY SHUTDOWN. LOSS OF VACUUM PRESSURE.
-      relay1_state = 0;
+      // LOSS OF VACUUM PRESSURE! EMERGENCY PUMP SHUTDOWN!
       relay2_state = 0;
     }
-    else{
-      // Shut down the oven if the pressure is too high.
-      relay1_state = 0;
-    }
+    // Shut down the oven if the pressure is too high.
+    relay1_state = 0;
   }
   
   // Set the relay states.
@@ -253,10 +253,10 @@ void loop() {
   }    
      
   // Hot-swappable SD card handler.
-  if(!sd_card_okay && card_detect == 1){ // Check for newly inserted SD card.
+  if(timestamp <= MAX_WRITE_TIME && (!sd_card_okay && card_detect == 1)){ // Check for newly inserted SD card.
     initSD();
   }
-  else if(sd_card_okay && card_detect == 0){ // Check for removed SD card.
+  else if(timestamp > MAX_WRITE_TIME || (sd_card_okay && card_detect == 0)){ // Check for removed SD card.
     sd_card_okay = false;
     
     // Force data to SD and update the directory entry to avoid data loss.
