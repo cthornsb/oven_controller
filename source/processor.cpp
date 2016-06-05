@@ -125,7 +125,7 @@ void help(char * prog_name_){
 int main(int argc, char* argv[]){
 	if(argc > 1 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)){
 		help(argv[0]);
-		return 1;
+		return 0;
 	}
 	else if(argc < 3){
 		std::cout << " Error: Invalid number of arguments to " << argv[0] << ". Expected 2, received " << argc-1 << ".\n";

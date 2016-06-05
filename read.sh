@@ -28,7 +28,7 @@ if [ $# -lt 2 ]; then
 fi
 
 echo -e "\n--Unpacking binary data--"
-$LOGGER_EXE $1 tmp.csv
+$LOGGER_EXE $1 tmp.csv --time 86400
 
 if [ ! -f "tmp.csv" ]; then
 	echo " Error: Failed to generate file 'tmp.csv'"

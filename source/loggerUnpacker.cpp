@@ -125,10 +125,11 @@ std::string sciNotation(const float &input_, const size_t &N_=2){
 void help(char * prog_name_){
 	std::cout << "  SYNTAX: " << prog_name_ << " <filename> [options] [output]\n";
 	std::cout << "   Available options:\n";
-	std::cout << "    --print      | Print unpacked data to stdout.\n";
-	std::cout << "    --serial     | Read data from a serial port.\n";
-	std::cout << "    --ascii      | Read ascii from the serial port.\n";
-	std::cout << "    --ping <num> | Ping serial port and display readings.\n";
+	std::cout << "    --print       | Print unpacked data to stdout.\n";
+	std::cout << "    --serial      | Read data from a serial port.\n";
+	std::cout << "    --ascii       | Read ascii from the serial port.\n";
+	std::cout << "    --ping <num>  | Ping serial port and display readings.\n";
+	std::cout << "    --time <time> | Read up until a maximum time (in seconds).\n";
 }
 
 int main(int argc, char *argv[]){
@@ -146,6 +147,7 @@ int main(int argc, char *argv[]){
 	bool ping_mode = false;
 	bool printout = false;
 	int num_ping = -1;
+	int max_time = -1;
 	
 	if(ifname.find("/dev/") == std::string::npos){
 		ofname = ifname.substr(0, ifname.find_last_of('.'))+".csv";
@@ -188,6 +190,19 @@ int main(int argc, char *argv[]){
 				return 1;
 			}
 			std::cout << "--Pinging device " << num_ping << " times.--\n";
+		}
+		else if(strcmp(argv[index], "--time") == 0){
+			if(index + 1 >= argc){
+				std::cout << " Error! Missing required argument to '--time'!\n";
+				help(argv[0]);
+				return 1;
+			}
+			max_time = atoi(argv[++index]);
+			if(max_time <= 0){
+				std::cout << " Error! Read time must be greater than zero!\n";
+				return 1;
+			}
+			std::cout << " Reading up to maximum data time of " << max_time << " seconds.\n";
 		}
 		else{ // Unrecognized command, must be the output filename.
 			ofname = std::string(argv[index]); 
@@ -341,6 +356,18 @@ int main(int argc, char *argv[]){
 				count++;
 				continue;
 			}
+		}
+		
+		// Skip the first data entry, because it is usually junk.
+		if(count == 0){
+			count++;
+			continue;
+		}
+		
+		// Check the time to see if we should stop reading.
+		if(max_time > 0 && (int)(timestamp/1000) > max_time){
+			std::cout << " Reached timestamp " << timestamp << " ms in file.\n";
+			break;
 		}
 		
 		// A voltage divider is used in order to get the full
