@@ -229,11 +229,17 @@ void loop() {
   }
   else{ relay1_state = 0; }
   
-  // Check for loss of vacuum.
-  if(pumped_down && pres > OVEN_MAX_PRESSURE){
-    // EMERGENCY SHUTDOWN. LOSS OF VACUUM PRESSURE.
-    relay1_state = 0;
-    relay2_state = 0;
+  // Check for over pressure state.
+  if(pres > OVEN_MAX_PRESSURE){
+    if(pumped_down){
+      // EMERGENCY SHUTDOWN. LOSS OF VACUUM PRESSURE.
+      relay1_state = 0;
+      relay2_state = 0;
+    }
+    else{
+      // Shut down the oven if the pressure is too high.
+      relay1_state = 0;
+    }
   }
   
   // Set the relay states.
