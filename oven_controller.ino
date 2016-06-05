@@ -26,9 +26,13 @@
 // Set the SD card detect pin.
 #define CARD_DETECT_PIN 2
 
-// Set the oven temperature control values.
+// Set the oven temperature control values (Celcius).
 #define OVEN_MAX_TEMP 89.0
 #define OVEN_MIN_TEMP 88.0
+ 
+// Set the maximum oven pressure reading (V).
+#define OVEN_MAX_PRESSURE 2.0017468
+#define PUMPED_DOWN_PRESSURE 1.8511003
 
 // Time (in milliseconds) to wait between read cycles.
 #define READ_DELAY 1000
@@ -49,6 +53,7 @@ char filename[13] = "DATA0001.DAT";
 
 bool sd_card_okay = false;
 bool over_temp = false;
+bool pumped_down = false;
 
 // File system object.
 SdFat sd;
@@ -200,6 +205,15 @@ void loop() {
   // Read the pressure from the pressure gauge.
   double pres = 5.0*analogRead(PRESSURE_PIN)/1023.0;
   
+  // Do not allow the oven to run without the vacuum pump.
+  if(relay2_state == 0){
+    relay1_state = 0; // Disable the oven relay.
+    pumped_down = false; // Reset the vacuum pressure interlock.
+  }
+  else if(pres <= PUMPED_DOWN_PRESSURE){
+    pumped_down = true; // Start the vacuum pressure interlock.
+  }
+  
   // Check for oven over temp.
   if(!over_temp){
     if(temp >= OVEN_MAX_TEMP){
@@ -214,6 +228,13 @@ void loop() {
     over_temp = false;
   }
   else{ relay1_state = 0; }
+  
+  // Check for loss of vacuum.
+  if(pumped_down && pres > OVEN_MAX_PRESSURE){
+    // EMERGENCY SHUTDOWN. LOSS OF VACUUM PRESSURE.
+    relay1_state = 0;
+    relay2_state = 0;
+  }
   
   // Set the relay states.
   if(relay1_state != prev_relay1_state){
