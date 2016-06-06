@@ -54,6 +54,9 @@ int prev_relay2_state = 0;
 int file_number = 1;
 char filename[13] = "DATA0001.DAT";
 
+// SD file title.
+char title[30] = "JUN062016_Tmin=88.0,Tmax=89.0";
+
 bool sd_card_okay = false;
 bool over_temp = false;
 bool pumped_down = false;
@@ -124,6 +127,12 @@ void openFile(){
   // Open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
   if (file.open(filename, O_CREAT | O_WRITE | O_EXCL)) {
+    // Write the length of the title.
+    file.write(30);
+    // Write the file title.
+    for(byte index = 0; index < 30; index++){
+      file.write(title[index]);
+    }
     // Write the packet delimiter to start the file.
     writeBytes((byte*)&delimiter, 4);
 #ifdef USE_SERIAL_ASCII     

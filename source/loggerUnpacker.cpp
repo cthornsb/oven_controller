@@ -38,6 +38,22 @@ void setup_signal_handlers(){
 	}
 }
 
+char readTitle(std::ifstream *f_, char *buf_, const char &len_){
+	if(!f_){ return 0; }
+
+	char titleLen;
+	f_->read(&titleLen, 1);
+
+	if(titleLen > len_){
+		titleLen = len_;
+		f_->read(buf_, len_-1);
+		buf_[len_-1] = '\0';
+		return len_;
+	}
+	f_->read(buf_, titleLen);
+	return titleLen;
+}
+
 size_t serialGets(const int &fd_, char *buf_, const size_t &len_){
 	int numBytes = read(fd_, buf_, len_-1);
 	if(numBytes >= 0){ buf_[len_-1] = '\0'; }
@@ -232,6 +248,10 @@ int main(int argc, char *argv[]){
 			output.close();
 			return 1; 
 		}
+		// Read the title.
+		char title[64];
+		readTitle(&file, title, 64);
+		printf(" Title: %s\n", title);
 	}
 	else{
 		fd = serialOpen(argv[1], 9600);
