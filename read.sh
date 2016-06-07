@@ -28,7 +28,7 @@ if [ $# -lt 2 ]; then
 fi
 
 echo -e "\n--Unpacking binary data--"
-$LOGGER_EXE $1 tmp.csv --time 86400
+$LOGGER_EXE $1 tmp.csv
 
 if [ ! -f "tmp.csv" ]; then
 	echo " Error: Failed to generate file 'tmp.csv'"
@@ -54,10 +54,10 @@ fi
 mv tmp.root data.root
 
 echo -e "\n--Generating temperature graph--\n"
-tgrapher data.root data seconds temperature --save graphs.root temp --batch
+tgrapher data.root data seconds temperature --save graphs.root temp --batch --gate seconds 0 86400
 
 echo -e "\n--Generating pressure graph--\n"
-tgrapher data.root data seconds pressure --save graphs.root pres --batch
+tgrapher data.root data seconds pressure --save graphs.root pres --batch --gate seconds 0 86400
 
 if [ ! -f "graphs.root" ]; then
 	echo " Error: Failed to generate file 'graphs.root'"
